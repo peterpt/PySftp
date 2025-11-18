@@ -46,12 +46,7 @@ Pillow
     Clone the repository:
     code Bash
    
-git clone https://github.com/peterpt/PySftp.git
-cd PySftp
-
-
-- Install the required libraries:
-pip3 install -r requirements.txt
+git clone https://github.com/peterpt/PySftp.git && cd PySftp && pip3 install -r requirements.txt --break-system-packages
    
 
 ## Usage
