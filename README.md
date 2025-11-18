@@ -7,6 +7,9 @@ PySFTP is a modern, feature-rich graphical SFTP client built with Python and the
 <img width="746" height="559" alt="image" src="https://github.com/user-attachments/assets/0240338e-30b8-48fe-8380-aae28e7261bf" />
 
 
+## Jump host Example
+<img width="1683" height="414" alt="image" src="https://github.com/user-attachments/assets/b292f0bd-075d-4f10-ad62-fa98f9caf456" />
+
 ## Features
 
 Dual-Pane Interface: Classic and intuitive layout for managing local and remote files side-by-side.
