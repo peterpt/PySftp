@@ -31,6 +31,7 @@ class PasswordDialog(ctk.CTkToplevel):
         super().__init__()
         self.title(title); self.lift(); self.attributes("-topmost", True); self.grab_set(); self.result = None
         self.label = ctk.CTkLabel(self, text=prompt); self.label.pack(padx=20, pady=10)
+        # Ensure show="*" is set here for the dialog input
         self.entry = ctk.CTkEntry(self, width=250, show="*"); self.entry.pack(padx=20, pady=5); self.entry.focus()
         self.show_password_var = ctk.StringVar(value="off")
         self.show_password_check = ctk.CTkCheckBox(self, text="Show password", variable=self.show_password_var, onvalue="on", offvalue="off", command=self.toggle_password_visibility); self.show_password_check.pack(padx=20, pady=5)
@@ -340,7 +341,12 @@ class App(ctk.CTk):
         self.target_label = ctk.CTkLabel(self.top_frame, text="Target Server:", font=ctk.CTkFont(weight="bold")); self.target_label.grid(row=0, column=0, padx=(0,10), pady=5, sticky="w")
         self.host_entry = ctk.CTkEntry(self.top_frame, placeholder_text="Target Host"); self.host_entry.grid(row=0, column=1, padx=5, pady=5, sticky="we")
         self.username_entry = ctk.CTkEntry(self.top_frame, placeholder_text="Target Username"); self.username_entry.grid(row=0, column=2, padx=5, pady=5, sticky="we")
-        self.password_entry = ctk.CTkEntry(self.top_frame, placeholder_text="Target Password", show="*"); self.password_entry.grid(row=0, column=3, padx=5, pady=5, sticky="we")
+        
+        # --- PASSWORD ENTRY (Ensure show="*" is here) ---
+        self.password_entry = ctk.CTkEntry(self.top_frame, placeholder_text="Target Password", show="*")
+        self.password_entry.grid(row=0, column=3, padx=5, pady=5, sticky="we")
+        # -----------------------------------------------
+        
         self.port_entry = ctk.CTkEntry(self.top_frame, placeholder_text="Target Port"); self.port_entry.grid(row=0, column=4, padx=5, pady=5, sticky="we")
         self.settings_button = ctk.CTkButton(self.top_frame, text="Settings", width=70, command=self.open_settings_dialog); self.settings_button.grid(row=0, column=5, padx=(10,0), pady=5)
         self.profiles_button = ctk.CTkButton(self.top_frame, text="Profiles", width=70, command=self.manage_profiles_dialog); self.profiles_button.grid(row=0, column=6, padx=(5,0), pady=5)
@@ -353,7 +359,12 @@ class App(ctk.CTk):
         self.jump_label = ctk.CTkLabel(self.jump_host_frame, text="Jump Host:", font=ctk.CTkFont(weight="bold")); self.jump_label.grid(row=0, column=0, padx=(0,10), pady=5, sticky="w")
         self.jump_host_entry = ctk.CTkEntry(self.jump_host_frame, placeholder_text="Jump Host"); self.jump_host_entry.grid(row=0, column=1, padx=5, pady=5, sticky="we")
         self.jump_user_entry = ctk.CTkEntry(self.jump_host_frame, placeholder_text="Jump Username"); self.jump_user_entry.grid(row=0, column=2, padx=5, pady=5, sticky="we")
-        self.jump_password_entry = ctk.CTkEntry(self.jump_host_frame, placeholder_text="Jump Password", show="*"); self.jump_password_entry.grid(row=0, column=3, padx=5, pady=5, sticky="we")
+        
+        # --- JUMP PASSWORD ENTRY (Ensure show="*" is here) ---
+        self.jump_password_entry = ctk.CTkEntry(self.jump_host_frame, placeholder_text="Jump Password", show="*")
+        self.jump_password_entry.grid(row=0, column=3, padx=5, pady=5, sticky="we")
+        # -----------------------------------------------------
+        
         self.jump_port_entry = ctk.CTkEntry(self.jump_host_frame, placeholder_text="Jump Port (22)"); self.jump_port_entry.grid(row=0, column=4, padx=5, pady=5, sticky="we")
         self.main_frame = ctk.CTkFrame(self); self.main_frame.grid(row=2, column=0, padx=10, pady=(5, 10), sticky="nsew")
         self.main_frame.grid_columnconfigure((0, 1), weight=1); self.main_frame.grid_rowconfigure(1, weight=1)
