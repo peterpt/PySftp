@@ -2,6 +2,7 @@ import customtkinter as ctk
 from customtkinter import CTkInputDialog
 import tkinter
 from tkinter import colorchooser
+import tkinter.font as tkfont
 import os
 import shutil
 import argparse
@@ -13,6 +14,10 @@ import base64
 import io
 import time
 import re
+
+# Requires: pip install pyte
+import pyte 
+
 from resources import FOLDER_ICON_B64, FILE_ICON_B64
 from sftp_client import (
     connect_sftp, upload_file, download_remote_item,
@@ -190,34 +195,101 @@ class SettingsDialog(ctk.CTkToplevel):
     def save_and_close(self): self.saved = True; self.destroy()
     def get_settings(self): self.wait_window(); return (self.bg_color, self.fg_color) if self.saved else None
 
+# --- TERMINAL WINDOW CLASS ---
 class TerminalWindow(ctk.CTkToplevel):
     def __init__(self, master, channel, title, bg_color, fg_color):
         super().__init__(master)
         self.title(f"SSH Terminal - {title}"); self.geometry("800x600"); self.channel = channel
-        self.textbox = ctk.CTkTextbox(self, font=("monospace", 12), fg_color=bg_color, text_color=fg_color)
-        self.textbox.pack(expand=True, fill="both")
-        self.textbox.bind("<Key>", self.on_key_press, add="+")
+        
+        self.font_family = self.get_monospaced_font()
+        self.font_size = 14
+        
+        self.screen = pyte.Screen(80, 24)
+        self.stream = pyte.Stream(self.screen)
+        
+        self.textbox = tkinter.Text(
+            self,
+            font=(self.font_family, self.font_size),
+            bg=bg_color,
+            fg=fg_color,
+            insertbackground=fg_color, 
+            state="disabled",
+            wrap="none",
+            borderwidth=0,
+            highlightthickness=0
+        )
+        self.textbox.pack(expand=True, fill="both", padx=0, pady=0)
+        
+        self.measuring_font = tkfont.Font(family=self.font_family, size=self.font_size)
+        self.char_width = self.measuring_font.measure("M")
+        self.char_height = self.measuring_font.metrics("linespace")
+
+        self.textbox.bind("<Key>", self.on_key_press)
         self.textbox.bind("<Control-c>", self.copy_text); self.textbox.bind("<Control-v>", self.paste_text)
         self.textbox.bind("<Control-Shift-C>", self.copy_text); self.textbox.bind("<Control-Shift-V>", self.paste_text)
+        
+        self.resize_timer = None
+        self.bind("<Configure>", self.on_resize) 
+        
         self.read_thread = threading.Thread(target=self.read_from_shell, daemon=True); self.read_thread.start()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
-        self.ansi_escape_pattern = re.compile(r'(\x1B\[[0-?]*[ -/]*[@-~]|\x1B].*?(\x07|\x1B\\))')
+        
+        self.after(100, self.refresh_screen)
+
+    def get_monospaced_font(self):
+        available = set(tkfont.families(root=self))
+        candidates = ["DejaVu Sans Mono", "Liberation Mono", "Ubuntu Mono", "Consolas", "Courier New", "Courier", "Monospace"]
+        for font in candidates:
+            if font in available: return font
+        return "TkFixedFont"
+
+    def on_resize(self, event):
+        if self.resize_timer: self.after_cancel(self.resize_timer)
+        self.resize_timer = self.after(100, self.update_pty_size)
+
+    def update_pty_size(self):
+        if not self.channel or self.channel.closed: return
+        term_width = self.textbox.winfo_width()
+        term_height = self.textbox.winfo_height()
+        cols = max(1, term_width // self.char_width)
+        rows = max(1, term_height // self.char_height)
+        self.screen.resize(lines=int(rows), columns=int(cols))
+        try: self.channel.resize_pty(width=int(cols), height=int(rows))
+        except Exception: pass
+
+    def refresh_screen(self):
+        if not self.textbox.winfo_exists(): return
+        display_lines = self.screen.display
+        full_text = "\n".join(display_lines)
+        self.textbox.configure(state="normal")
+        self.textbox.delete("1.0", "end")
+        self.textbox.insert("1.0", full_text)
+        cursor_pos = f"{self.screen.cursor.y + 1}.{self.screen.cursor.x}"
+        self.textbox.mark_set("insert", cursor_pos)
+        self.textbox.see("insert")
+        self.textbox.configure(state="disabled")
+        self.after(50, self.refresh_screen)
+
     def copy_text(self, event=None):
         try:
+            self.textbox.configure(state="normal")
             selected_text = self.textbox.get("sel.first", "sel.last")
             if selected_text: self.clipboard_clear(); self.clipboard_append(selected_text)
+            self.textbox.configure(state="disabled")
         except tkinter.TclError: pass
         return "break"
+
     def paste_text(self, event=None):
         try:
             clipboard_text = self.clipboard_get()
             if clipboard_text and self.channel.send_ready(): self.channel.send(clipboard_text)
         except tkinter.TclError: pass
         return "break"
+
     def on_key_press(self, event):
         if not self.channel.send_ready(): return "break"
         if event.keysym == 'Return': self.channel.send('\n')
-        elif event.keysym == 'BackSpace': self.channel.send('\x08')
+        elif event.keysym == 'BackSpace': self.channel.send('\x7f') 
         elif event.keysym == 'Tab': self.channel.send('\t')
         elif event.keysym == 'Up': self.channel.send('\x1b[A')
         elif event.keysym == 'Down': self.channel.send('\x1b[B')
@@ -225,21 +297,25 @@ class TerminalWindow(ctk.CTkToplevel):
         elif event.keysym == 'Left': self.channel.send('\x1b[D')
         elif event.char and event.char.isprintable(): self.channel.send(event.char)
         return "break"
+        
     def read_from_shell(self):
         try:
+            self.after(500, self.update_pty_size)
             while self.channel and not self.channel.closed:
-                data = self.channel.recv(1024).decode('utf-8', errors='ignore')
-                if data: self.after(0, self.insert_text, data)
+                data = self.channel.recv(1024)
+                if data: 
+                    try:
+                        text_data = data.decode('utf-8', errors='ignore')
+                        self.stream.feed(text_data)
+                    except Exception: pass
                 else: break
         except Exception: pass
         finally: self.after(0, self.on_close)
-    def insert_text(self, text):
-        if self.textbox.winfo_exists():
-            clean_text = self.ansi_escape_pattern.sub('', text); clean_text = clean_text.replace('\r', '')
-            self.textbox.insert("end", clean_text); self.textbox.see("end")
+
     def on_close(self):
         if self.channel and not self.channel.closed: self.channel.close()
         self.destroy()
+# ----------------------------------------------------------------
 
 class App(ctk.CTk):
     def __init__(self, cli_args):
@@ -444,11 +520,22 @@ class App(ctk.CTk):
         self.clear_knock_config(); config = configparser.ConfigParser(); config.read(self.config_file)
         if not config.has_section(profile_name): return
         p = config[profile_name]
-        for entry in [self.host_entry, self.username_entry, self.password_entry, self.port_entry, self.jump_host_entry, self.jump_user_entry, self.jump_password_entry, self.jump_port_entry]: entry.delete(0, 'end')
-        self.host_entry.insert(0, p.get('host', '')); self.username_entry.insert(0, p.get('user', '')); self.port_entry.insert(0, p.get('port', ''))
+        
+        # --- FIX: Only insert if value exists to preserve placeholders ---
+        entries = [self.host_entry, self.username_entry, self.password_entry, self.port_entry, self.jump_host_entry, self.jump_user_entry, self.jump_password_entry, self.jump_port_entry]
+        for entry in entries: entry.delete(0, 'end')
+
+        if p.get('host'): self.host_entry.insert(0, p.get('host'))
+        if p.get('user'): self.username_entry.insert(0, p.get('user'))
+        if p.get('port'): self.port_entry.insert(0, p.get('port'))
+        
         use_jump = p.getboolean('use_jump', False); self.use_jump_host_var.set(use_jump)
         if use_jump:
-            self.jump_host_entry.insert(0, p.get('jump_host', '')); self.jump_user_entry.insert(0, p.get('jump_user', '')); self.jump_port_entry.insert(0, p.get('jump_port', ''))
+            if p.get('jump_host'): self.jump_host_entry.insert(0, p.get('jump_host'))
+            if p.get('jump_user'): self.jump_user_entry.insert(0, p.get('jump_user'))
+            if p.get('jump_port'): self.jump_port_entry.insert(0, p.get('jump_port'))
+        # -----------------------------------------------------------------
+
         self.toggle_jump_host_frame()
         self.current_knock_config['enabled'] = p.getboolean('knock_enabled', False)
         if self.current_knock_config['enabled']:
