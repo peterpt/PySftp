@@ -375,10 +375,27 @@ class App(ctk.CTk):
         self.remote_path_label = ctk.CTkLabel(self.main_frame, text="Remote: Not Connected", anchor="w"); self.remote_path_label.grid(row=0, column=1, padx=10, pady=(5,0), sticky="ew")
         self.remote_file_list = ctk.CTkScrollableFrame(self.remote_frame, label_text="Remote Server"); self.remote_file_list.pack(expand=True, fill="both", padx=5, pady=5)
         self.status_bar = ctk.CTkLabel(self, text="Ready", anchor="w"); self.status_bar.grid(row=3, column=0, padx=10, pady=(0, 10), sticky="ew")
-        self.remote_context_menu = tkinter.Menu(self, tearoff=0); self.remote_context_menu.add_command(label="Download", command=self.context_download); self.remote_context_menu.add_command(label="Move/Rename", command=self.context_remote_move)
-        self.remote_context_menu.add_command(label="Delete", command=self.context_remote_delete); self.remote_context_menu.add_separator(); self.remote_context_menu.add_command(label="Create Folder", command=self.context_remote_create_folder)
-        self.local_context_menu = tkinter.Menu(self, tearoff=0); self.local_context_menu.add_command(label="Upload", command=self.context_upload); self.local_context_menu.add_command(label="Move/Rename", command=self.context_local_move)
-        self.local_context_menu.add_command(label="Delete", command=self.context_local_delete); self.local_context_menu.add_separator(); self.local_context_menu.add_command(label="Create Folder", command=self.context_local_create_folder)
+        
+        # --- UPDATED CONTEXT MENUS (Refresh Added) ---
+        self.remote_context_menu = tkinter.Menu(self, tearoff=0)
+        self.remote_context_menu.add_command(label="Refresh", command=self.populate_remote_files) # Added Refresh
+        self.remote_context_menu.add_separator()
+        self.remote_context_menu.add_command(label="Download", command=self.context_download)
+        self.remote_context_menu.add_command(label="Move/Rename", command=self.context_remote_move)
+        self.remote_context_menu.add_command(label="Delete", command=self.context_remote_delete)
+        self.remote_context_menu.add_separator()
+        self.remote_context_menu.add_command(label="Create Folder", command=self.context_remote_create_folder)
+
+        self.local_context_menu = tkinter.Menu(self, tearoff=0)
+        self.local_context_menu.add_command(label="Refresh", command=self.populate_local_files) # Added Refresh
+        self.local_context_menu.add_separator()
+        self.local_context_menu.add_command(label="Upload", command=self.context_upload)
+        self.local_context_menu.add_command(label="Move/Rename", command=self.context_local_move)
+        self.local_context_menu.add_command(label="Delete", command=self.context_local_delete)
+        self.local_context_menu.add_separator()
+        self.local_context_menu.add_command(label="Create Folder", command=self.context_local_create_folder)
+        # ---------------------------------------------
+
         self.local_file_list.bind("<Button-3>", lambda event: self.show_local_context_menu(event)); self.remote_file_list.bind("<Button-3>", lambda event: self.show_remote_context_menu(event))
         self.local_file_list.bind("<Button-1>", lambda event: self.handle_selection(None, "local")); self.remote_file_list.bind("<Button-1>", lambda event: self.handle_selection(None, "remote"))
         self.load_app_settings()
@@ -492,7 +509,10 @@ class App(ctk.CTk):
     def _clear_remote_pane(self):
         self.handle_selection(None, "remote"); [w.destroy() for w in self.remote_file_list.winfo_children()]; self.remote_path_label.configure(text="Remote: Not Connected")
     def create_file_entry(self, parent_frame, name, is_dir, double_click_handler, pane):
-        icon = self.folder_icon if is_dir else self.file_icon; entry = ctk.CTkLabel(parent_frame, text=f" {name}", image=icon, compound="left", anchor="w"); entry.pack(fill="x", pady=1)
+        icon = self.folder_icon if is_dir else self.file_icon
+        # Explicit height added to ensure icon (20px) is not clipped
+        entry = ctk.CTkLabel(parent_frame, text=f" {name}", image=icon, compound="left", anchor="w", height=25)
+        entry.pack(fill="x", pady=1)
         entry.bind("<Double-1>", lambda event, n=name, d=is_dir: double_click_handler(n, d)); entry.bind("<Button-1>", lambda event, w=entry, p=pane: self.handle_selection(w, p))
         if pane == 'remote': entry.bind("<Button-3>", lambda event, w=entry: self.show_remote_context_menu(event, w))
         elif pane == 'local': entry.bind("<Button-3>", lambda event, w=entry: self.show_local_context_menu(event, w))
