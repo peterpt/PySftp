@@ -655,10 +655,12 @@ class App(ctk.CTk):
             except Exception as e: self.status_bar.configure(text=f"Error deleting: {e}")
         else: self.status_bar.configure(text="Deletion canceled.")
     def open_terminal_choice(self):
-        target_name = self.host_entry.get(); jump_name = self.jump_host_entry.get() if self.use_jump_host_var.get() else None
-        dialog = TerminalChoiceDialog(target_name=target_name, jump_name=jump_name); choice = dialog.get_choice()
-        if choice == "target" and self.ssh_client: channel = self.ssh_client.invoke_shell(term='xterm'); TerminalWindow(self, channel, target_name, self.terminal_bg_color, self.terminal_fg_color)
-        elif choice == "jump" and self.jump_client: channel = self.jump_client.invoke_shell(term='xterm'); TerminalWindow(self, channel, jump_name, self.terminal_bg_color, self.terminal_fg_color)
+        target_name = self.host_entry.get()
+        jump_name = self.jump_host_entry.get() if self.use_jump_host_var.get() else None
+        dialog = TerminalChoiceDialog(target_name=target_name, jump_name=jump_name)
+        choice = dialog.get_choice())
+        if choice == "target" and self.ssh_client: channel = self.ssh_client.invoke_shell(term='vt100'); TerminalWindow(self, channel, target_name, self.terminal_bg_color, self.terminal_fg_color)
+        elif choice == "jump" and self.jump_client: channel = self.jump_client.invoke_shell(term='vt100'); TerminalWindow(self, channel, jump_name, self.terminal_bg_color, self.terminal_fg_color)
     
     # --- MOUSE WHEEL SCROLLING LOGIC ---
     def _setup_scroll_bindings(self):
